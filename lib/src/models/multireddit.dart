@@ -10,17 +10,46 @@ import '../api_paths.dart';
 import '../base.dart';
 import '../reddit.dart';
 import '../user.dart';
+import '../exceptions.dart';
 import 'redditor.dart';
 import 'subreddit.dart';
 
 /// [key_color]: RGB Hex color code of the form i.e "#FFFFFF".
 
-enum Visibility { hidden, private, public }
-enum WeightingScheme { classic, fresh }
+enum MultiredditVisibility { hidden, private, public }
+String multiredditVisibilityToString(MultiredditVisibility v) {
+  switch (v) {
+    case MultiredditVisibility.hidden:
+      return "hidden";
+      break;
+    case MultiredditVisibility.private:
+      return "private";
+      break;
+    case MultiredditVisibility.public:
+      return "public";
+      break;
+    default:
+      throw new DRAWInternalError('Visiblitity: $v is not supported');
+  }
+}
 
-//TODO(kchopra): Need to implement string value for '' and 'None' with capital 'N'.
+enum MultiredditWeightingScheme { classic, fresh }
+
+String multiredditWeightingSchemeToString(MultiredditWeightingScheme ws) {
+  switch (ws) {
+    case MultiredditWeightingScheme.classic:
+      return "classic";
+      break;
+    case MultiredditWeightingScheme.fresh:
+      return "fresh";
+      break;
+    default:
+      throw new DRAWInternalError('WeightingScheme: $ws is not supported');
+  }
+}
+
 //For Reference: "https://www.reddit.com/dev/api/#PUT_api_multi_{multipath}".
-enum IconName {
+enum MultiredditIconName {
   artAndDesign,
   ask,
   books,
@@ -50,23 +79,130 @@ enum IconName {
   travel,
   unusualStories,
   video,
-  None,
+  emptyString,
+  none,
+}
+
+String multiredditIconNameToString(MultiredditIconName iconName) {
+  switch (iconName) {
+    case MultiredditIconName.artAndDesign:
+      return "art and design";
+      break;
+    case MultiredditIconName.ask:
+      return "ask";
+      break;
+    case MultiredditIconName.books:
+      return "books";
+      break;
+    case MultiredditIconName.business:
+      return "business";
+      break;
+    case MultiredditIconName.cars:
+      return "cars";
+      break;
+    case MultiredditIconName.comic:
+      return "comics";
+      break;
+    case MultiredditIconName.cuteAnimals:
+      return "cute animals";
+      break;
+    case MultiredditIconName.diy:
+      return "diy";
+      break;
+    case MultiredditIconName.entertainment:
+      return "entertainment";
+      break;
+    case MultiredditIconName.foodAndDrink:
+      return "food and drink";
+      break;
+    case MultiredditIconName.funny:
+      return "funny";
+      break;
+    case MultiredditIconName.games:
+      return "games";
+      break;
+    case MultiredditIconName.grooming:
+      return "grooming";
+      break;
+    case MultiredditIconName.health:
+      return "health";
+      break;
+    case MultiredditIconName.lifeAdvice:
+      return "life advice";
+      break;
+    case MultiredditIconName.military:
+      return "military";
+      break;
+    case MultiredditIconName.modelsPinup:
+      return "models pinup";
+      break;
+    case MultiredditIconName.music:
+      return "music";
+      break;
+    case MultiredditIconName.news:
+      return "news";
+      break;
+    case MultiredditIconName.philosophy:
+      return "philosophy";
+      break;
+    case MultiredditIconName.picturesAndGifs:
+      return "pictures and gifs";
+      break;
+    case MultiredditIconName.science:
+      return "science";
+      break;
+    case MultiredditIconName.shopping:
+      return "shopping";
+      break;
+    case MultiredditIconName.sports:
+      return "sports";
+      break;
+    case MultiredditIconName.style:
+      return "style";
+      break;
+    case MultiredditIconName.tech:
+      return "tech";
+      break;
+    case MultiredditIconName.travel:
+      return "travel";
+      break;
+    case MultiredditIconName.unusualStories:
+      return "unusual stories";
+      break;
+    case MultiredditIconName.video:
+      return "video";
+      break;
+    case MultiredditIconName.emptyString:
+      return "";
+      break;
+    case MultiredditIconName.none:
+      return "None";
+      break;
+    default:
+      throw new DRAWInternalError('IconName: $iconName is not supported');
+  }
 }
 
 /// A class which repersents a Multireddit, which is a collection of
 /// [Subreddit]s. This is not yet implemented.
 //TODO(kchopra): Implement subreddit list storage.
 class Multireddit extends RedditBase {
-  final String kDisplayName = 'display_name';
-  final String kFrom = "from";
-  final String kTo = "to";
-  final String kMultiApi = 'multireddit_api';
-  final String kMultiRename = 'multireddit_rename';
+  static const String kDescriptionMd = "description_md";
+  static const String kDisplayName = 'display_name';
+  static const String kFrom = "from";
+  static const String kIconName = 'icon_name';
+  static const String kMultiApi = 'multireddit_api';
+  static const String kMultiredditCopy = 'multireddit_copy';
+  static const String kMultiredditRename = 'multireddit_rename';
+  static const String kMultiredditUpdate = 'multireddit_update';
+  static const String kSubreddits = "subreddits";
+  static const String kTo = "to";
+  static const String kVisibility = "visibility";
+  static const String kWeightingScheme = "weighting_scheme";
+  static const int redditorNameInPathIndex = 2;
 
-  final int redditorNameInPathIndex = 2;
-
-  static final RegExp _multiredditRegExp = new RegExp(r'{multi}');
   static RegExp get multiredditRegExp => _multiredditRegExp;
+  static final RegExp _multiredditRegExp = new RegExp(r'{multi}');
 
   Redditor _author;
 
@@ -82,13 +218,12 @@ class Multireddit extends RedditBase {
   Multireddit.parse(Reddit reddit, Map data)
       : super.loadData(reddit, data['data']) {
     _name = data['data']['name'];
-
     _author = new Redditor.name(
         reddit, data['data']['path'].split('/')[redditorNameInPathIndex]);
     _path = apiPath['multireddit']
         .replaceAll(_multiredditRegExp, _name)
         .replaceAll(User.userRegExp, _author.displayName);
-    _infoPath = apiPath[multiApi]
+    _infoPath = apiPath[kMultiApi]
         .replaceAll(_multiredditRegExp, _name)
         .replaceAll(User.userRegExp, _author.displayName);
   }
@@ -114,8 +249,10 @@ class Multireddit extends RedditBase {
   /// Add a [Subreddit] to this [Multireddit].
   ///
   /// [subreddit] is the name of the [Subreddit] to be added to this [Multireddit].
-  Future add(String subreddit) async {
-    final url = apiPath['multireddit_update']
+  Future add({String subreddit, Subreddit subredditInstance}) async {
+    subreddit = subredditInstance?.displayName;
+    if (subreddit == null) return;
+    final url = apiPath[kMultiredditUpdate]
         .replaceAll(User.userRegExp, _author.displayName)
         .replaceAll(_multiredditRegExp, _name)
         .replaceAll(Subreddit.subredditRegExp, subreddit);
@@ -132,7 +269,7 @@ class Multireddit extends RedditBase {
   /// multireddit and be used as the source for the [name]. If [displayName] is not
   /// provided, the [name] and [displayName] of the muti being copied will be used.
   Future<Multireddit> copy([String displayName]) async {
-    final url = apiPath['multireddit_copy'];
+    final url = apiPath[kMultiredditCopy];
     final name = sluggify(displayName) ?? _name;
 
     displayName ??= _displayName;
@@ -155,8 +292,10 @@ class Multireddit extends RedditBase {
   /// Remove a [Subreddit] from this [Multireddit].
   ///
   /// [subreddit] contains the name of the subreddit to be deleted.
-  Future remove(String subreddit) async {
-    final url = apiPath['multireddit_update']
+  Future remove({String subreddit, Subreddit subredditInstance}) async {
+    subreddit = subredditInstance?.displayName;
+    if (subreddit == null) return;
+    final url = apiPath[kMultiredditUpdate]
         .replaceAll(_multiredditRegExp, _name)
         .replaceAll(User.userRegExp, _author)
         .replaceAll(Subreddit.subredditRegExp, subreddit);
@@ -169,7 +308,7 @@ class Multireddit extends RedditBase {
   /// [displayName] is the new display for this [Multireddit].
   /// The [name] will be auto generated from the displayName.
   Future rename(displayName) async {
-    final url = apiPath[multiRename];
+    final url = apiPath[kMultiredditRename];
     final data = {
       kFrom: _path,
       kDisplayName: _displayName,
@@ -180,30 +319,18 @@ class Multireddit extends RedditBase {
 
   /// Update this [Multireddit].
   ///
-  // TODO(chkartik): Import Color into here.
   /// [key_color]: RGB Hex color code of the form i.e "#FFFFFF".
-  /// [visibility]: Can be one of: [hidden], [private], [public].
-  /// [weighting_scheme]: Can be one of: [classic], [fresh].
-  // TODO(ckartik): Pass in optional params instead of Map, and turn these into enums! Not smart Kartik! :(
-  static const String kSubreddits = "subreddits";
-  static const String kDescriptionMd = "description_md";
-  static const String kIconName = 'icon_name';
-  static const String kVisibility = "visibility";
-  static const String kWeightingScheme = "weighting_scheme";
-
-  // https://i.imgur.com/kRO1z6Z.gif
-  String parseEnumString(String enumString) => enumString.split('.')[1].replaceAllMapped(new RegExp('[A-Z]'), (m) => ' ${m.group(0)}'.toLowerCase());
-
+  // TODO(ckartik): Do something with keyColor (i.e attach to HTTP data).
   Future update(
       {final String displayName,
       final List<String> subreddits,
       final String descriptionMd,
-      final IconName iconName,
+      final MultiredditIconName iconName,
       final Color keyColor,
-      final Visibility visibility,
-      final WeightingScheme weightingScheme}) async {
-    final Map newSettings = {};
-    if (displayName != null){
+      final MultiredditVisibility visibility,
+      final MultiredditWeightingScheme weightingScheme}) async {
+    final newSettings = {};
+    if (displayName != null) {
       newSettings[kDisplayName] = displayName;
     }
     final newSubredditList =
@@ -215,13 +342,14 @@ class Multireddit extends RedditBase {
       newSettings[kDescriptionMd] = descriptionMd;
     }
     if (iconName != null) {
-      newSettings[kIconName] = parseEnumString(iconName.toString());
+      newSettings[kIconName] = multiredditIconNameToString(iconName);
     }
-    if (visibility != null){
-      newSettings[kVisibility] = parseEnumString(visibility.toString());
+    if (visibility != null) {
+      newSettings[kVisibility] = multiredditVisibilityToString(visibility);
     }
-    if (weightingScheme != null){
-      newSettings[kWeightingScheme] = parseEnumString(weightingScheme.toString());
+    if (weightingScheme != null) {
+      newSettings[kWeightingScheme] =
+          multiredditWeightingSchemeToString(weightingScheme);
     }
     //Link to api docs: https://www.reddit.com/dev/api/#PUT_api_multi_{multipath}
     final res = await reddit.put(_infoPath, body: newSettings.toString());
