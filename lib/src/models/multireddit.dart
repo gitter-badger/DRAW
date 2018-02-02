@@ -187,19 +187,20 @@ String multiredditIconNameToString(MultiredditIconName iconName) {
 /// [Subreddit]s. This is not yet implemented.
 //TODO(kchopra): Implement subreddit list storage.
 class Multireddit extends RedditBase {
-  static const String kDescriptionMd = "description_md";
-  static const String kDisplayName = 'display_name';
-  static const String kFrom = "from";
-  static const String kIconName = 'icon_name';
-  static const String kMultiApi = 'multireddit_api';
-  static const String kMultiredditCopy = 'multireddit_copy';
-  static const String kMultiredditRename = 'multireddit_rename';
-  static const String kMultiredditUpdate = 'multireddit_update';
-  static const String kSubreddits = "subreddits";
-  static const String kTo = "to";
-  static const String kVisibility = "visibility";
-  static const String kWeightingScheme = "weighting_scheme";
-  static const int redditorNameInPathIndex = 2;
+  static const String _kColor = "key_color";
+  static const String _kDescriptionMd = "description_md";
+  static const String _kDisplayName = 'display_name';
+  static const String _kFrom = "from";
+  static const String _kIconName = 'icon_name';
+  static const String _kMultiApi = 'multireddit_api';
+  static const String _kMultiredditCopy = 'multireddit_copy';
+  static const String _kMultiredditRename = 'multireddit_rename';
+  static const String _kMultiredditUpdate = 'multireddit_update';
+  static const String _kSubreddits = "subreddits";
+  static const String _kTo = "to";
+  static const String _kVisibility = "visibility";
+  static const String _kWeightingScheme = "weighting_scheme";
+  static const int _redditorNameInPathIndex = 2;
 
   static RegExp get multiredditRegExp => _multiredditRegExp;
   static final RegExp _multiredditRegExp = new RegExp(r'{multi}');
@@ -219,11 +220,11 @@ class Multireddit extends RedditBase {
       : super.loadData(reddit, data['data']) {
     _name = data['data']['name'];
     _author = new Redditor.name(
-        reddit, data['data']['path'].split('/')[redditorNameInPathIndex]);
+        reddit, data['data']['path'].split('/')[_redditorNameInPathIndex]);
     _path = apiPath['multireddit']
         .replaceAll(_multiredditRegExp, _name)
         .replaceAll(User.userRegExp, _author.displayName);
-    _infoPath = apiPath[kMultiApi]
+    _infoPath = apiPath[_kMultiApi]
         .replaceAll(_multiredditRegExp, _name)
         .replaceAll(User.userRegExp, _author.displayName);
   }
@@ -252,7 +253,7 @@ class Multireddit extends RedditBase {
   Future add({String subreddit, Subreddit subredditInstance}) async {
     subreddit = subredditInstance?.displayName;
     if (subreddit == null) return;
-    final url = apiPath[kMultiredditUpdate]
+    final url = apiPath[_kMultiredditUpdate]
         .replaceAll(User.userRegExp, _author.displayName)
         .replaceAll(_multiredditRegExp, _name)
         .replaceAll(Subreddit.subredditRegExp, subreddit);
@@ -269,15 +270,15 @@ class Multireddit extends RedditBase {
   /// multireddit and be used as the source for the [name]. If [displayName] is not
   /// provided, the [name] and [displayName] of the muti being copied will be used.
   Future<Multireddit> copy([String displayName]) async {
-    final url = apiPath[kMultiredditCopy];
+    final url = apiPath[_kMultiredditCopy];
     final name = sluggify(displayName) ?? _name;
 
     displayName ??= _displayName;
 
     final data = {
-      kDisplayName: displayName,
-      kFrom: _path,
-      kTo: apiPath['multiredit']
+      _kDisplayName: displayName,
+      _kFrom: _path,
+      _kTo: apiPath['multiredit']
           .replaceAll(_multiredditRegExp, name)
           .replaceAll(User.userRegExp, reddit.user.me()),
     };
@@ -295,7 +296,7 @@ class Multireddit extends RedditBase {
   Future remove({String subreddit, Subreddit subredditInstance}) async {
     subreddit = subredditInstance?.displayName;
     if (subreddit == null) return;
-    final url = apiPath[kMultiredditUpdate]
+    final url = apiPath[_kMultiredditUpdate]
         .replaceAll(_multiredditRegExp, _name)
         .replaceAll(User.userRegExp, _author)
         .replaceAll(Subreddit.subredditRegExp, subreddit);
@@ -308,48 +309,48 @@ class Multireddit extends RedditBase {
   /// [displayName] is the new display for this [Multireddit].
   /// The [name] will be auto generated from the displayName.
   Future rename(displayName) async {
-    final url = apiPath[kMultiredditRename];
+    final url = apiPath[_kMultiredditRename];
     final data = {
-      kFrom: _path,
-      kDisplayName: _displayName,
+      _kFrom: _path,
+      _kDisplayName: _displayName,
     };
     await reddit.post(url, data);
     _displayName = displayName;
   }
 
   /// Update this [Multireddit].
-  ///
-  /// [key_color]: RGB Hex color code of the form i.e "#FFFFFF".
-  // TODO(ckartik): Do something with keyColor (i.e attach to HTTP data).
   Future update(
       {final String displayName,
       final List<String> subreddits,
       final String descriptionMd,
       final MultiredditIconName iconName,
-      final Color keyColor,
+      final Color color,
       final MultiredditVisibility visibility,
       final MultiredditWeightingScheme weightingScheme}) async {
     final newSettings = {};
     if (displayName != null) {
-      newSettings[kDisplayName] = displayName;
+      newSettings[_kDisplayName] = displayName;
     }
     final newSubredditList =
         subreddits?.map((item) => {'name': item})?.toList();
     if (newSubredditList != null) {
-      newSettings[kSubreddits] = newSubredditList;
+      newSettings[_kSubreddits] = newSubredditList;
     }
     if (descriptionMd != null) {
-      newSettings[kDescriptionMd] = descriptionMd;
+      newSettings[_kDescriptionMd] = descriptionMd;
     }
     if (iconName != null) {
-      newSettings[kIconName] = multiredditIconNameToString(iconName);
+      newSettings[_kIconName] = multiredditIconNameToString(iconName);
     }
     if (visibility != null) {
-      newSettings[kVisibility] = multiredditVisibilityToString(visibility);
+      newSettings[_kVisibility] = multiredditVisibilityToString(visibility);
     }
     if (weightingScheme != null) {
-      newSettings[kWeightingScheme] =
+      newSettings[_kWeightingScheme] =
           multiredditWeightingSchemeToString(weightingScheme);
+    }
+    if (color != null) {
+      newSettings[_kcolor] = color.getHexColor().toString();
     }
     //Link to api docs: https://www.reddit.com/dev/api/#PUT_api_multi_{multipath}
     final res = await reddit.put(_infoPath, body: newSettings.toString());
