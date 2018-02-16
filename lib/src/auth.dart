@@ -1,4 +1,4 @@
-// Copyright (c) 2017, the Dart Reddit API Wrapper  project authors.
+// Copyright (c) 2017, the Dart Reddit API Wrapper project authors.
 // Please see the AUTHORS file for details. All rights reserved.
 // Use of this source code is governed by a BSD-style license that
 // can be found in the LICENSE file.
@@ -10,20 +10,23 @@ import 'package:http/http.dart' as http;
 import 'package:oauth2/oauth2.dart' as oauth2;
 import "package:oauth2/src/handle_access_token_response.dart";
 
+import 'draw_config_context.dart';
 import 'exceptions.dart';
 
-const String kGetRequest = 'GET';
-const String kPostRequest = 'POST';
+const String _kDeleteRequest = 'DELETE';
+const String _kGetRequest = 'GET';
+const String _kPostRequest = 'POST';
+const String _kPutRequest = 'PUT';
 
-const String kDurationKey = 'duration';
-const String kErrorKey = 'error';
-const String kGrantTypeKey = 'grant_type';
-const String kMessageKey = 'message';
-const String kPasswordKey = 'password';
-const String kTokenKey = 'token';
-const String kTokenTypeHintKey = 'token_type_hint';
-const String kUserAgentKey = 'user-agent';
-const String kUsernameKey = 'username';
+const String _kDurationKey = 'duration';
+const String _kErrorKey = 'error';
+const String _kGrantTypeKey = 'grant_type';
+const String _kMessageKey = 'message';
+const String _kPasswordKey = 'password';
+const String _kTokenKey = 'token';
+const String _kTokenTypeHintKey = 'token_type_hint';
+const String _kUserAgentKey = 'user-agent';
+const String _kUsernameKey = 'username';
 
 /// The [Authenticator] class provides an interface to interact with the Reddit API
 /// using OAuth2. An [Authenticator] is responsible for keeping track of OAuth2
@@ -32,11 +35,11 @@ const String kUsernameKey = 'username';
 abstract class Authenticator {
   oauth2.AuthorizationCodeGrant _grant;
   oauth2.Client _client;
-  String _userAgent;
+  DRAWConfigContext _config;
 
-  Authenticator(oauth2.AuthorizationCodeGrant grant, String userAgent)
-      : _grant = grant,
-        _userAgent = userAgent,
+  Authenticator(DRAWConfigContext config, oauth2.AuthorizationCodeGrant grant)
+      : _config = config,
+        _grant = grant,
         _client = null;
 
   /// Request a new access token from the Reddit API. Throws a
@@ -49,45 +52,43 @@ abstract class Authenticator {
     await _authenticationFlow();
   }
 
-  /// Revokes any outstanding tokens associated with the authenticator.
+  /// Revokes any outstanding tokens associated with the [Authenticator].
   Future revoke() async {
     if (credentials == null) {
       return;
     }
     final tokens = new List<Map>();
     final accessToken = {
-      kTokenKey: credentials.accessToken,
-      kTokenTypeHintKey: 'access_token',
+      _kTokenKey: credentials.accessToken,
+      _kTokenTypeHintKey: 'access_token',
     };
     tokens.add(accessToken);
 
     if (credentials.refreshToken != null) {
       final refreshToken = {
-        kTokenKey: credentials.refreshToken,
-        kTokenTypeHintKey: 'refresh_token',
+        _kTokenKey: credentials.refreshToken,
+        _kTokenTypeHintKey: 'refresh_token',
       };
       tokens.add(refreshToken);
     }
     for (final token in tokens) {
       final revokeAccess = new Map<String, String>();
-      revokeAccess[kTokenKey] = token[kTokenKey];
-      revokeAccess[kTokenTypeHintKey] = token[kTokenTypeHintKey];
+      revokeAccess[_kTokenKey] = token[_kTokenKey];
+      revokeAccess[_kTokenTypeHintKey] = token[_kTokenTypeHintKey];
 
-      // TODO(bkonyi) we shouldn't have hardcoded urls like this. Move to common
-      // file with all API related strings.
-      var path = Uri.parse(r'https://www.reddit.com/api/v1/revoke_token');
+      var path = Uri.parse(_config.revokeToken);
 
       // Retrieve the client ID and secret.
       final clientId = _grant.identifier;
       final clientSecret = _grant.secret;
 
-      if ((clientId != null) && (clientSecret != null)) {
+      if ((_config.clientId != null) && (_config.clientSecret != null)) {
         final userInfo = '$clientId:$clientSecret';
         path = path.replace(userInfo: userInfo);
       }
 
       final headers = new Map<String, String>();
-      headers[kUserAgentKey] = _userAgent;
+      headers[_kUserAgentKey] = _config.userAgent;
 
       final httpClient = new http.Client();
 
@@ -109,16 +110,35 @@ abstract class Authenticator {
   /// [Authenticator] must implement this method.
   Future _authenticationFlow();
 
-  /// Make a simple `GET` request. [path] is the destination URI that the
-  /// request will be made to.
-  Future<Map> get(Uri path, {Map params}) async {
-    return _request(kGetRequest, path, params: params);
+  /// Make a simple `GET` request.
+  ///
+  /// [path] is the destination URI that the request will be made to.
+  Future get(Uri path, {Map params}) async {
+    return _request(_kGetRequest, path, params: params);
   }
 
-  /// Make a simple `POST` request. [path] is the destination URI and [body]
-  /// contains the POST parameters that will be sent with the request.
-  Future<Map> post(Uri path, Map<String, String> body) async {
-    return _request(kPostRequest, path, body: body);
+  /// Make a simple `POST` request.
+  ///
+  /// [path] is the destination URI and [body] contains the POST parameters
+  /// that will be sent with the request.
+  Future post(Uri path, Map<String, String> body) async {
+    return _request(_kPostRequest, path, body: body);
+  }
+
+  /// Make a simple `PUT` request.
+  ///
+  /// [path] is the destination URI and [body] contains the PUT parameters that
+  /// will be sent with the request.
+  Future put(Uri path, {/* Map<String,String>, String */ body}) async {
+    return _request(_kPutRequest, path, body: body);
+  }
+
+  /// Make a simple `DELETE` request.
+  ///
+  /// [path] is the destination URI and [body] contains the DELETE parameters
+  /// that will be sent with the request.
+  Future delete(Uri path, {/* Map<String,String>, String */ body}) async {
+    return _request(_kDeleteRequest, path, body: body);
   }
 
   /// Request data from Reddit using our OAuth2 client.
@@ -126,8 +146,8 @@ abstract class Authenticator {
   /// [type] can be one of `GET`, `POST`, and `PUT`. [path] represents the
   /// request parameters. [body] is an optional parameter which contains the
   /// body fields for a POST request.
-  Future<Map> _request(String type, Uri path,
-      {Map<String, String> body, Map params}) async {
+  Future _request(String type, Uri path,
+      {/* Map<String,String>, String */ body, Map params}) async {
     if (_client == null) {
       throw new DRAWAuthenticationError(
           'The authenticator does not have a valid token.');
@@ -137,12 +157,32 @@ abstract class Authenticator {
     }
     final finalPath = path.replace(queryParameters: params);
     final request = new http.Request(type, finalPath);
+
+    // Some API requests initiate a redirect (i.e., random submission from a
+    // subreddit) but the redirect doesn't forward the OAuth credentials
+    // automatically. We disable redirects here and throw a DRAWRedirectResponse
+    // so that we can handle the redirect manually on a case-by-case basis.
+    request.followRedirects = false;
+
     if (body != null) {
-      request.bodyFields = body;
+      if (body is Map<String, String>) {
+        request.bodyFields = body;
+      } else {
+        request.body = body;
+      }
     }
-    final http.StreamedResponse response = await _client.send(request);
-    final parsed = JSON.decode(await response.stream.bytesToString());
-    if (parsed.containsKey(kErrorKey)) {
+    final responseStream = await _client.send(request);
+    if (responseStream.isRedirect) {
+      var redirectStr = Uri.parse(responseStream.headers['location']).path;
+      if (redirectStr.endsWith('.json')) {
+        redirectStr = redirectStr.substring(0, redirectStr.length - 5);
+      }
+      throw new DRAWRedirectResponse(redirectStr, responseStream);
+    }
+    final response = await responseStream.stream.bytesToString();
+    if (response.isEmpty) return null;
+    final parsed = JSON.decode(response);
+    if ((parsed is Map) && parsed.containsKey(_kErrorKey)) {
       _throwAuthenticationError(parsed);
     }
     return parsed;
@@ -163,7 +203,7 @@ abstract class Authenticator {
     final httpClient = new http.Client();
     final start = new DateTime.now();
     final headers = new Map<String, String>();
-    headers[kUserAgentKey] = _userAgent;
+    headers[_kUserAgentKey] = _config.userAgent;
 
     // Request the token from the server.
     final response = await httpClient.post(
@@ -173,7 +213,7 @@ abstract class Authenticator {
 
     // Check for error response.
     final responseMap = JSON.decode(response.body);
-    if (responseMap.containsKey(kErrorKey)) {
+    if (responseMap.containsKey(_kErrorKey)) {
       _throwAuthenticationError(responseMap);
     }
 
@@ -187,8 +227,8 @@ abstract class Authenticator {
   }
 
   void _throwAuthenticationError(Map response) {
-    final statusCode = response[kErrorKey];
-    final reason = response[kMessageKey];
+    final statusCode = response[_kErrorKey];
+    final reason = response[_kMessageKey];
     throw new DRAWAuthenticationError(
         'Status Code: ${statusCode} Reason: ${reason}');
   }
@@ -203,7 +243,7 @@ abstract class Authenticator {
   ///
   /// Returns the user agent value which is used as an identifier for this
   /// session. Provided on authenticator creation.
-  String get userAgent => _userAgent;
+  String get userAgent => _config.userAgent;
 
   /// A flag representing whether or not this authenticator instance is valid.
   ///
@@ -216,23 +256,18 @@ abstract class Authenticator {
 
 /// The [ScriptAuthenticator] class allows for the creation of an [Authenticator]
 /// instance which is associated with a valid Reddit user account. This is to be
-/// used with the 'Script' app type credentials. Refer to
-/// https://github.com/reddit/reddit/wiki/OAuth2-App-Types for descriptions of
-/// valid app types.
+/// used with the 'Script' app type credentials. Refer to Reddit's
+/// [documentation](https://github.com/reddit/reddit/wiki/OAuth2-App-Types)
+/// for descriptions of valid app types.
 class ScriptAuthenticator extends Authenticator {
-  String _username;
-  String _password;
+  ScriptAuthenticator._(
+      DRAWConfigContext config, oauth2.AuthorizationCodeGrant grant)
+      : super(config, grant);
 
-  ScriptAuthenticator._(oauth2.AuthorizationCodeGrant grant, String userAgent,
-      String username, String password)
-      : _username = username,
-        _password = password,
-        super(grant, userAgent);
-
-  static Future<ScriptAuthenticator> create(oauth2.AuthorizationCodeGrant grant,
-      String userAgent, String username, String password) async {
+  static Future<ScriptAuthenticator> create(
+      DRAWConfigContext config, oauth2.AuthorizationCodeGrant grant) async {
     final ScriptAuthenticator authenticator =
-        new ScriptAuthenticator._(grant, userAgent, username, password);
+        new ScriptAuthenticator._(config, grant);
     await authenticator._authenticationFlow();
     return authenticator;
   }
@@ -243,10 +278,10 @@ class ScriptAuthenticator extends Authenticator {
   @override
   Future _authenticationFlow() async {
     final accountInfo = new Map<String, String>();
-    accountInfo[kUsernameKey] = _username;
-    accountInfo[kPasswordKey] = _password;
-    accountInfo[kGrantTypeKey] = 'password';
-    accountInfo[kDurationKey] = 'permanent';
+    accountInfo[_kUsernameKey] = _config.username;
+    accountInfo[_kPasswordKey] = _config.password;
+    accountInfo[_kGrantTypeKey] = 'password';
+    accountInfo[_kDurationKey] = 'permanent';
     await _requestToken(accountInfo);
   }
 }
@@ -255,16 +290,18 @@ class ScriptAuthenticator extends Authenticator {
 /// instance which is not associated with any reddit account. As the name
 /// implies, the [ReadOnlyAuthenticator] can only be used to make read-only
 /// requests to the Reddit API that do not require access to a valid Reddit user
-/// account. Refer to https://github.com/reddit/reddit/wiki/OAuth2-App-Types for
+/// account. Refer to Reddit's
+/// [documentation](https://github.com/reddit/reddit/wiki/OAuth2-App-Types) for
 /// descriptions of valid app types.
 class ReadOnlyAuthenticator extends Authenticator {
-  ReadOnlyAuthenticator._(oauth2.AuthorizationCodeGrant grant, String userAgent)
-      : super(grant, userAgent);
+  ReadOnlyAuthenticator._(
+      DRAWConfigContext config, oauth2.AuthorizationCodeGrant grant)
+      : super(config, grant);
 
   static Future<ReadOnlyAuthenticator> create(
-      oauth2.AuthorizationCodeGrant grant, String userAgent) async {
+      DRAWConfigContext config, oauth2.AuthorizationCodeGrant grant) async {
     final ReadOnlyAuthenticator authenticator =
-        new ReadOnlyAuthenticator._(grant, userAgent);
+        new ReadOnlyAuthenticator._(config, grant);
     await authenticator._authenticationFlow();
     return authenticator;
   }
@@ -275,7 +312,7 @@ class ReadOnlyAuthenticator extends Authenticator {
   @override
   Future _authenticationFlow() async {
     final accountInfo = new Map<String, String>();
-    accountInfo[kGrantTypeKey] = 'client_credentials';
+    accountInfo[_kGrantTypeKey] = 'client_credentials';
     await _requestToken(accountInfo);
   }
 }
@@ -285,23 +322,23 @@ class ReadOnlyAuthenticator extends Authenticator {
 /// a browser. The [url] method is used to generate the URL that the user uses
 /// to authenticate on www.reddit.com, and the [authorize] method retrieves the
 /// access token given the returned `code`. This is to be
-/// used with the 'Web' app type credentials. Refer to
-/// https://github.com/reddit/reddit/wiki/OAuth2-App-Types for descriptions of
-/// valid app types.
+/// used with the 'Web' app type credentials. Refer to Reddit's
+/// [documentation](https://github.com/reddit/reddit/wiki/OAuth2-App-Types)
+/// for descriptions of valid app types.
 class WebAuthenticator extends Authenticator {
   Uri _redirect;
 
   WebAuthenticator._(
-      oauth2.AuthorizationCodeGrant grant, String userAgent, Uri redirect)
-      : _redirect = redirect,
-        super(grant, userAgent) {
+      DRAWConfigContext config, oauth2.AuthorizationCodeGrant grant)
+      : _redirect = Uri.parse(config.redirectUrl),
+        super(config, grant) {
     assert(_redirect != null);
   }
 
   static WebAuthenticator create(
-      oauth2.AuthorizationCodeGrant grant, String userAgent, Uri redirect) {
+      DRAWConfigContext config, oauth2.AuthorizationCodeGrant grant) {
     final WebAuthenticator authenticator =
-        new WebAuthenticator._(grant, userAgent, redirect);
+        new WebAuthenticator._(config, grant);
     return authenticator;
   }
 
@@ -327,13 +364,13 @@ class WebAuthenticator extends Authenticator {
     Uri redditAuthUri =
         _grant.getAuthorizationUrl(_redirect, scopes: scopes, state: state);
     if (redditAuthUri == null) {
-      // TODO(bkonyi) throw meaningful exception.
-      assert(false);
+      throw new DRAWAuthenticationError('The Auth URL for Reddit must not be '
+          'null');
     }
     // getAuthorizationUrl returns a Uri which is missing the duration field, so
     // we need to add it here.
     final queryParameters = new Map.from(redditAuthUri.queryParameters);
-    queryParameters[kDurationKey] = duration;
+    queryParameters[_kDurationKey] = duration;
     redditAuthUri = redditAuthUri.replace(queryParameters: queryParameters);
     if (compactLogin) {
       String path = redditAuthUri.path;

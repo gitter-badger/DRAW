@@ -1,4 +1,4 @@
-// Copyright (c) 2017, the Dart Reddit API Wrapper  project authors.
+// Copyright (c) 2017, the Dart Reddit API Wrapper project authors.
 // Please see the AUTHORS file for details. All rights reserved.
 // Use of this source code is governed by a BSD-style license that
 // can be found in the LICENSE file.
@@ -11,6 +11,7 @@ import 'package:collection/collection.dart';
 import 'package:reply/reply.dart';
 
 import 'package:draw/src/auth.dart';
+import 'package:draw/src/draw_config_context.dart';
 import 'package:draw/src/exceptions.dart';
 
 /// A drop-in replacement for [Authenticator], used for recording and replaying
@@ -32,7 +33,7 @@ class TestAuthenticator extends Authenticator {
   TestAuthenticator(String recordingPath, {Authenticator recordAuth})
       : _recordingPath = recordingPath,
         _recordAuth = recordAuth,
-        super(null, null) {
+        super(new DRAWConfigContext(), null) {
     if (isRecording) {
       final rawRecording = new File(recordingPath).readAsStringSync();
       _recording = new Recording.fromJson(JSON.decode(rawRecording),
@@ -59,31 +60,67 @@ class TestAuthenticator extends Authenticator {
   }
 
   @override
-  Future<Map> get(Uri path, {Map params}) async {
-    Map result;
+  Future get(Uri path, {Map params}) async {
+    const redirectResponseStr = 'DRAWRedirectResponse';
+    var result;
     if (isRecording) {
-      // TODO(bkonyi): grab the response based on query.
-      return _recording.reply([path.toString(), params]);
+      result = _recording.reply([path.toString(), params.toString()]);
+      if ((result is List) && (result[0] == redirectResponseStr)) {
+        throw new DRAWRedirectResponse(result[1], null);
+      }
     } else {
-      print(path.toString());
-      result = await _recordAuth.get(path);
-      // TODO(bkonyi): do we always want to reply?
-      _recorder.given([path.toString(), params]).reply(result).always();
+      try {
+        result = await _recordAuth.get(path, params: params);
+      } on DRAWRedirectResponse catch (e) {
+        _recorder.given([path.toString(), params.toString()]).reply(
+            [redirectResponseStr, e.path]).once();
+        throw e;
+      }
+      _recorder
+          .given([path.toString(), params.toString()])
+          .reply(result)
+          .once();
     }
     return result;
   }
 
   @override
-  Future<Map> post(Uri path, Map<String, String> body) async {
-    Map result;
+  Future post(Uri path, Map<String, String> body) async {
+    var result;
     if (isRecording) {
-      return _recording.reply([path.toString(), body]);
+      result = _recording.reply([path.toString(), body.toString()]);
     } else {
-      print(path.toString());
       result = await _recordAuth.post(path, body);
-      _recorder.given([path.toString(), body]).reply(result).always();
+      _recorder.given([path.toString(), body.toString()]).reply(result).once();
+    }
+    return (result == '') ? null : result;
+  }
+
+  @override
+  Future put(Uri path, {/* Map<String, String>, String */ body}) async {
+    var result;
+    if (isRecording) {
+      result = _recording.reply([path.toString(), body.toString()]);
+    } else {
+      result = await _recordAuth.put(path, body: body);
+      _recorder.given([path.toString(), body.toString()]).reply(result).once();
     }
     return result;
+  }
+
+  @override
+  Future delete(Uri path, {/* Map<String, String>, String */ body}) async {
+    var result;
+    if (isRecording) {
+      result = _recording.reply([path.toString(), body.toString()]);
+    } else {
+      result = await _recordAuth.delete(path, body: body);
+      _recorder
+          .given([path.toString(), body.toString()])
+          .reply(result ?? '')
+          .once();
+    }
+    return (result == '') ? null : result;
   }
 
   @override

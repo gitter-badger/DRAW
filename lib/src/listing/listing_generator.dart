@@ -13,6 +13,18 @@ import '../reddit.dart';
 abstract class ListingGenerator {
   static const defaultRequestLimit = 100;
 
+  static int getLimit(Map params) {
+    if ((params != null) && params.containsKey('limit')) {
+      return params['limit'];
+    }
+    return null;
+  }
+
+  static Stream<T> createBasicGenerator<T>(
+          final Reddit reddit, final String path,
+          {Map params}) =>
+      generator<T>(reddit, path, limit: getLimit(params), params: params);
+
   /// An asynchronous iterator method used to make Reddit API calls as defined
   /// by [api] in blocks of size [limit]. The default [limit] is specified by
   /// [defaultRequestLimit]. Returns a [Stream<T>] which can be iterated over
@@ -20,17 +32,27 @@ abstract class ListingGenerator {
   static Stream<T> generator<T>(final Reddit reddit, final String api,
       {int limit, Map params}) async* {
     final kLimitKey = 'limit';
+    final kAfterKey = 'after';
     final nullLimit = 1024;
-    final paramsInternal = params ?? new Map();
-    paramsInternal[kLimitKey] = (limit ?? nullLimit).toString();
+    final paramsInternal = (params == null) ? new Map() : new Map.from(params);
+    final _limit = limit ?? nullLimit;
+    paramsInternal[kLimitKey] = _limit.toString();
     int yielded = 0;
     int index = 0;
     List<T> listing;
+    bool exhausted = false;
 
     Future<List<T>> _nextBatch() async {
+      if (exhausted) {
+        return null;
+      }
       final response = (await reddit.get(api, params: paramsInternal)) as Map;
       final newListing = response['listing'];
-      paramsInternal['after'] = response['after'];
+      if (response[kAfterKey] == null) {
+        exhausted = true;
+      } else {
+        paramsInternal[kAfterKey] = response[kAfterKey];
+      }
       if (newListing.length == 0) {
         return null;
       }
@@ -38,12 +60,8 @@ abstract class ListingGenerator {
       return newListing;
     }
 
-    while (yielded < limit) {
+    while ((_limit == null) || (yielded < _limit)) {
       if ((listing == null) || (index >= listing.length)) {
-        if (listing != null &&
-            listing.length < int.parse(paramsInternal[kLimitKey])) {
-          break;
-        }
         listing = await _nextBatch();
         if (listing == null) {
           break;
