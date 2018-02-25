@@ -14,5 +14,12 @@ Future main() async {
   test('lib/subreddit/banned', () async {
     final reddit = await createRedditTestInstance(
         'test/multireddit/lib_multireddit_banned.json', live:true);
+    Map data = {
+      'name': 'drawapitesting',
+
+    Map testData = {
+      'data': data
+    }
+    final multireddit = new Multireddit.parse(reddit, );
   });
 }
