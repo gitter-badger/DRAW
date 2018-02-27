@@ -212,6 +212,10 @@ class Multireddit extends RedditBase {
   String _name;
   String _path;
 
+  // lazy initialization of subreddits.
+  List<String> get subreddits => _subreddits;
+  final _subreddits = [];
+
   String get displayName => _displayName ?? _name;
   String get path => _path ?? '/';
 
@@ -223,11 +227,14 @@ class Multireddit extends RedditBase {
         _displayName = name,
         super.withPath(reddit, Multireddit._generateInfoPath(name, user));
 
+  // TODO(@ckartik): Check with @bkonyi if some of the assignments here are safe.
   Multireddit.parse(Reddit reddit, Map data)
       : super.loadData(reddit, data['data']) {
     _name = data['data']['name'];
+    // TODO(@ckartik): Make this less obfuscated.
     _author = new Redditor.name(
         reddit, data['data']['path'].split('/')[_redditorNameInPathIndex]);
+    data['data']['subreddits'].forEach((pair) => _subreddits.add(pair["name"]));
     _path = _generateInfoPath(_name, _author.displayName);
     _infoPath = apiPath[_kMultiApi]
         .replaceAll(Multireddit.multiredditRegExp, _name)
@@ -275,7 +282,7 @@ class Multireddit extends RedditBase {
     // TODO(ckartik): Research if we should GET subreddits.
   }
 
-  // TODO(@ckartik): Ask @bkonyi if this function shoudl me moved in as a static function
+  // TODO(@ckartik): Ask @bkonyi if this function should me moved in as a static function
   // in the [Subreddit] class, and the respective versions of it like [_redditorNameHelper]
   // in [Subreddit] me moved into the [Redditor] class as a static function.
   String _subredditNameHelper(/* String, Subreddit */ subreddit) {
@@ -302,9 +309,10 @@ class Multireddit extends RedditBase {
     final data = {
       _kDisplayName: displayName,
       _kFrom: _path,
-      _kTo: apiPath['multiredit']
+      _kTo: apiPath['multireddit']
           .replaceAll(Multireddit.multiredditRegExp, name)
-          .replaceAll(User.userRegExp, reddit.user.me()),
+          .replaceAll(User.userRegExp,
+          await reddit.user.me().then((me) => me.displayName)),
     };
     return await reddit.post(url, data);
   }
@@ -381,5 +389,6 @@ class Multireddit extends RedditBase {
     final Multireddit newMulti = new Multireddit.parse(reddit, res['data']);
     _displayName = newMulti.displayName;
     _name = newMulti.displayName;
+    _subreddits = newMulti._subreddits;
   }
 }
