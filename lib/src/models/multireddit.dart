@@ -14,18 +14,16 @@ import '../exceptions.dart';
 import 'redditor.dart';
 import 'subreddit.dart';
 
-/// [key_color]: RGB Hex color code of the form i.e "#FFFFFF".
-
-enum MultiredditVisibility { hidden, private, public }
-String multiredditVisibilityToString(MultiredditVisibility v) {
+enum Visibility { hidden, private, public }
+String visibilityToString(Visibility v) {
   switch (v) {
-    case MultiredditVisibility.hidden:
+    case Visibility.hidden:
       return "hidden";
       break;
-    case MultiredditVisibility.private:
+    case Visibility.private:
       return "private";
       break;
-    case MultiredditVisibility.public:
+    case Visibility.public:
       return "public";
       break;
     default:
@@ -33,14 +31,13 @@ String multiredditVisibilityToString(MultiredditVisibility v) {
   }
 }
 
-enum MultiredditWeightingScheme { classic, fresh }
-
-String multiredditWeightingSchemeToString(MultiredditWeightingScheme ws) {
+enum WeightingScheme { classic, fresh }
+String weightingSchemeToString(WeightingScheme ws) {
   switch (ws) {
-    case MultiredditWeightingScheme.classic:
+    case WeightingScheme.classic:
       return "classic";
       break;
-    case MultiredditWeightingScheme.fresh:
+    case WeightingScheme.fresh:
       return "fresh";
       break;
     default:
@@ -49,7 +46,7 @@ String multiredditWeightingSchemeToString(MultiredditWeightingScheme ws) {
 }
 
 //For Reference: "https://www.reddit.com/dev/api/#PUT_api_multi_{multipath}".
-enum MultiredditIconName {
+enum IconName {
   artAndDesign,
   ask,
   books,
@@ -83,99 +80,99 @@ enum MultiredditIconName {
   none,
 }
 
-String multiredditIconNameToString(MultiredditIconName iconName) {
+String iconNameToString(IconName iconName) {
   switch (iconName) {
-    case MultiredditIconName.artAndDesign:
+    case IconName.artAndDesign:
       return "art and design";
       break;
-    case MultiredditIconName.ask:
+    case IconName.ask:
       return "ask";
       break;
-    case MultiredditIconName.books:
+    case IconName.books:
       return "books";
       break;
-    case MultiredditIconName.business:
+    case IconName.business:
       return "business";
       break;
-    case MultiredditIconName.cars:
+    case IconName.cars:
       return "cars";
       break;
-    case MultiredditIconName.comic:
+    case IconName.comic:
       return "comics";
       break;
-    case MultiredditIconName.cuteAnimals:
+    case IconName.cuteAnimals:
       return "cute animals";
       break;
-    case MultiredditIconName.diy:
+    case IconName.diy:
       return "diy";
       break;
-    case MultiredditIconName.entertainment:
+    case IconName.entertainment:
       return "entertainment";
       break;
-    case MultiredditIconName.foodAndDrink:
+    case IconName.foodAndDrink:
       return "food and drink";
       break;
-    case MultiredditIconName.funny:
+    case IconName.funny:
       return "funny";
       break;
-    case MultiredditIconName.games:
+    case IconName.games:
       return "games";
       break;
-    case MultiredditIconName.grooming:
+    case IconName.grooming:
       return "grooming";
       break;
-    case MultiredditIconName.health:
+    case IconName.health:
       return "health";
       break;
-    case MultiredditIconName.lifeAdvice:
+    case IconName.lifeAdvice:
       return "life advice";
       break;
-    case MultiredditIconName.military:
+    case IconName.military:
       return "military";
       break;
-    case MultiredditIconName.modelsPinup:
+    case IconName.modelsPinup:
       return "models pinup";
       break;
-    case MultiredditIconName.music:
+    case IconName.music:
       return "music";
       break;
-    case MultiredditIconName.news:
+    case IconName.news:
       return "news";
       break;
-    case MultiredditIconName.philosophy:
+    case IconName.philosophy:
       return "philosophy";
       break;
-    case MultiredditIconName.picturesAndGifs:
+    case IconName.picturesAndGifs:
       return "pictures and gifs";
       break;
-    case MultiredditIconName.science:
+    case IconName.science:
       return "science";
       break;
-    case MultiredditIconName.shopping:
+    case IconName.shopping:
       return "shopping";
       break;
-    case MultiredditIconName.sports:
+    case IconName.sports:
       return "sports";
       break;
-    case MultiredditIconName.style:
+    case IconName.style:
       return "style";
       break;
-    case MultiredditIconName.tech:
+    case IconName.tech:
       return "tech";
       break;
-    case MultiredditIconName.travel:
+    case IconName.travel:
       return "travel";
       break;
-    case MultiredditIconName.unusualStories:
+    case IconName.unusualStories:
       return "unusual stories";
       break;
-    case MultiredditIconName.video:
+    case IconName.video:
       return "video";
       break;
-    case MultiredditIconName.emptyString:
+    case IconName.emptyString:
       return "";
       break;
-    case MultiredditIconName.none:
+    case IconName.none:
       return "None";
       break;
     default:
@@ -204,41 +201,42 @@ class Multireddit extends RedditBase {
 
   static final RegExp multiredditRegExp = new RegExp(r'{multi}');
 
-  Redditor _author;
+  Redditor get author => new Redditor.name(reddit, _author);
+  String _author;
 
-  // TODO(@ckartik): Go through and replace instances of [_displayName] with just [_name].
-  String _displayName;
-  String _infoPath;
+  // lazy initialization of subreddits?
+  List<String> get subreddits => _subreddits;
+  List<String> _subreddits = [];
+
+  String get displayName => _name;
   String _name;
+
+  String get path => _path ?? '/';
   String _path;
 
-  // lazy initialization of subreddits.
-  List<String> get subreddits => _subreddits;
-  final _subreddits = [];
-
-  String get displayName => _displayName ?? _name;
-  String get path => _path ?? '/';
+  String get infoPath => _infoPath;
+  String _infoPath;
 
   /// The name constructor for multireddit
   ///
   /// Returns an instance of Multireddit with the corresponding name.
-  Multireddit.name(Reddit reddit, String name, String user)
-      : _name = name,
-        _displayName = name,
-        super.withPath(reddit, Multireddit._generateInfoPath(name, user));
+  Multireddit.name(Reddit reddit, String multiName, String userName)
+      : _name = multiName,
+        super.withPath(
+            reddit, Multireddit._generateInfoPath(multiName, userName));
 
   // TODO(@ckartik): Check with @bkonyi if some of the assignments here are safe.
   Multireddit.parse(Reddit reddit, Map data)
       : super.loadData(reddit, data['data']) {
     _name = data['data']['name'];
     // TODO(@ckartik): Make this less obfuscated.
-    _author = new Redditor.name(
-        reddit, data['data']['path'].split('/')[_redditorNameInPathIndex]);
-    data['data']['subreddits'].forEach((pair) => _subreddits.add(pair["name"]));
-    _path = _generateInfoPath(_name, _author.displayName);
+    _author = data['data']['path'].split('/')[_redditorNameInPathIndex];
+    _path = _generateInfoPath(_name, _author);
     _infoPath = apiPath[_kMultiApi]
         .replaceAll(Multireddit.multiredditRegExp, _name)
-        .replaceAll(User.userRegExp, _author.displayName);
+        .replaceAll(User.userRegExp, _author);
+    // Loading local lazy instance of Subreddits list in form of a String list.
+    data['data']['subreddits'].forEach((pair) => _subreddits.add(pair["name"]));
   }
 
   // Returns valid info_path for multireddit with name `name`.
@@ -272,7 +270,7 @@ class Multireddit extends RedditBase {
     subreddit = _subredditNameHelper;
     if (subreddit == null) return;
     final url = apiPath[_kMultiredditUpdate]
-        .replaceAll(User.userRegExp, _author.displayName)
+        .replaceAll(User.userRegExp, _author)
         .replaceAll(Multireddit.multiredditRegExp, _name)
         .replaceAll(Subreddit.subredditRegExp, subreddit);
     final data = {'model': "{'name': $subreddit}"};
@@ -297,22 +295,22 @@ class Multireddit extends RedditBase {
 
   /// Copy this [Multireddit], and return the new [Multireddit].
   ///
-  /// [displayName] is an optional string that will become the display name of the new
-  /// multireddit and be used as the source for the [name]. If [displayName] is not
-  /// provided, the [name] and [displayName] of the muti being copied will be used.
-  Future<Multireddit> copy([String displayName]) async {
+  /// [multiName] is an optional string that will become the display name of the new
+  /// multireddit and be used as the source for the [name]. If [multiName] is not
+  /// provided, the [name] and [multiName] of the muti being copied will be used.
+  Future<Multireddit> copy([String multiName]) async {
     final url = apiPath[_kMultiredditCopy];
-    final name = sluggify(displayName) ?? _name;
+    final name = sluggify(multiName) ?? _name;
 
-    displayName ??= _displayName;
+    multiName ??= _name;
 
     final data = {
-      _kDisplayName: displayName,
+      _kDisplayName: multiName,
       _kFrom: _path,
       _kTo: apiPath['multireddit']
           .replaceAll(Multireddit.multiredditRegExp, name)
           .replaceAll(User.userRegExp,
-          await reddit.user.me().then((me) => me.displayName)),
+              await reddit.user.me().then((me) => me.displayName)),
     };
     return await reddit.post(url, data);
   }
@@ -338,16 +336,16 @@ class Multireddit extends RedditBase {
 
   /// Rename this [Multireddit].
   ///
-  /// [displayName] is the new display for this [Multireddit].
+  /// [newName] is the new display for this [Multireddit].
   /// The [name] will be auto generated from the displayName.
-  Future rename(displayName) async {
+  Future rename(newName) async {
     final url = apiPath[_kMultiredditRename];
     final data = {
-      _kFrom: _path,
-      _kDisplayName: _displayName,
+      _kFrom: _infoPath,
+      _kTo: _name,
     };
     await reddit.post(url, data);
-    _displayName = displayName;
+    _name = newName;
   }
 
   /// Update this [Multireddit].
@@ -355,14 +353,19 @@ class Multireddit extends RedditBase {
       {final String displayName,
       final List<String> subreddits,
       final String descriptionMd,
-      final MultiredditIconName iconName,
+      final IconName iconName,
       final Color color,
-      final MultiredditVisibility visibility,
-      final MultiredditWeightingScheme weightingScheme}) async {
+      final Visibility visibility,
+      final WeightingScheme weightingScheme}) async {
     final newSettings = {};
     if (displayName != null) {
       newSettings[_kDisplayName] = displayName;
     }
+    /*
+      The Reddit api requires we use the following JSON for a subreddit:
+      {'name': theNameOfTheSubreddit}, for each subreddit in the list.
+      For this reason we do a map here to convert back to api format.
+     */
     final newSubredditList =
         subreddits?.map((item) => {'name': item})?.toList();
     if (newSubredditList != null) {
@@ -372,14 +375,14 @@ class Multireddit extends RedditBase {
       newSettings[_kDescriptionMd] = descriptionMd;
     }
     if (iconName != null) {
-      newSettings[_kIconName] = multiredditIconNameToString(iconName);
+      newSettings[_kIconName] = iconNameToString(iconName);
     }
     if (visibility != null) {
-      newSettings[_kVisibility] = multiredditVisibilityToString(visibility);
+      newSettings[_kVisibility] = visibilityToString(visibility);
     }
     if (weightingScheme != null) {
       newSettings[_kWeightingScheme] =
-          multiredditWeightingSchemeToString(weightingScheme);
+          weightingSchemeToString(weightingScheme);
     }
     if (color != null) {
       newSettings[_kColor] = color.toHexColor().toString();
@@ -387,7 +390,6 @@ class Multireddit extends RedditBase {
     //Link to api docs: https://www.reddit.com/dev/api/#PUT_api_multi_{multipath}
     final res = await reddit.put(_infoPath, body: newSettings.toString());
     final Multireddit newMulti = new Multireddit.parse(reddit, res['data']);
-    _displayName = newMulti.displayName;
     _name = newMulti.displayName;
     _subreddits = newMulti._subreddits;
   }

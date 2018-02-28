@@ -52,6 +52,24 @@ Future main() async {
       {"name": "AppalachianTrail"}
     ];
 
+//    test('lib/multireddit/rename', () async {
+//    final reddit = await createRedditTestInstance(
+//        'test/multireddit/lib_multireddit_rename.json',
+//    live: true);
+//    final data = {
+//      "kind": "LabeledMulti",
+//      "data": {
+//        "display_name": "test-copy-adventure-2",
+//        "name": "test-copy-adventure-2",
+//        "path": "/user/MyFifthOne/m/adventure/",
+//      }
+//    };
+//    final multireddit = new Multireddit.parse(reddit, data);
+//    final newMulti = await multireddit.copy('test-copy-adventure-2');
+//    expect(newMulti.displayName, 'test_copy_adventure_2');
+//    expect(newMulti.subreddits, multireddit.subreddits);
+//  });
+
   test('lib/multireddit/copy', () async {
     final reddit = await createRedditTestInstance(
         'test/multireddit/lib_multireddit_copy.json');
