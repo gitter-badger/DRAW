@@ -205,7 +205,12 @@ class Multireddit extends RedditBase {
   String _author;
 
   // lazy initialization of subreddits?
+  // Hack -> Is there a better way to do this @bkonyi?
   List<String> get subreddits => _subreddits;
+  Future<List<String>> get loadSubreddits async => fetch()
+      .then((data) => data['data']['subreddits']
+      .forEach((pair) => _subreddits.add(pair["name"])));
+
   List<String> _subreddits = [];
 
   String get displayName => _name;
@@ -222,21 +227,25 @@ class Multireddit extends RedditBase {
   /// Returns an instance of Multireddit with the corresponding name.
   Multireddit.name(Reddit reddit, String multiName, String userName)
       : _name = multiName,
+        _author = userName,
         super.withPath(
-            reddit, Multireddit._generateInfoPath(multiName, userName));
+            reddit, Multireddit._generateInfoPath(multiName, userName)){
+    _infoPath = Multireddit._generateInfoPath(multiName, userName);
+    _path = _generateInfoPath(multiName, userName);
+  }
 
   // TODO(@ckartik): Check with @bkonyi if some of the assignments here are safe.
   Multireddit.parse(Reddit reddit, Map data)
       : super.loadData(reddit, data['data']) {
     _name = data['data']['name'];
     // TODO(@ckartik): Make this less obfuscated.
-    _author = data['data']['path'].split('/')[_redditorNameInPathIndex];
+    _author = data['data']['path']?.split('/')[_redditorNameInPathIndex];
     _path = _generateInfoPath(_name, _author);
     _infoPath = apiPath[_kMultiApi]
         .replaceAll(Multireddit.multiredditRegExp, _name)
         .replaceAll(User.userRegExp, _author);
     // Loading local lazy instance of Subreddits list in form of a String list.
-    data['data']['subreddits'].forEach((pair) => _subreddits.add(pair["name"]));
+    data['data']['subreddits']?.forEach((pair) => _subreddits.add(pair["name"]));
   }
 
   // Returns valid info_path for multireddit with name `name`.
@@ -342,10 +351,11 @@ class Multireddit extends RedditBase {
     final url = apiPath[_kMultiredditRename];
     final data = {
       _kFrom: _infoPath,
-      _kTo: _name,
+      _kTo: newName,
     };
-    await reddit.post(url, data);
+    final response = await reddit.post(url, data);
     _name = newName;
+    return response;
   }
 
   /// Update this [Multireddit].
